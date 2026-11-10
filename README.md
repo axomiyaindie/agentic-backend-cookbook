@@ -49,12 +49,13 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | Which database type fits my data? | [`10-reference/database-types.md`](10-reference/database-types.md) |
 | REST, GraphQL, gRPC, or SOAP — which one? | [`10-reference/api-styles.md`](10-reference/api-styles.md) |
 | How do I actually write typed models in FastAPI? | [`10-reference/fastapi-types-example.py`](10-reference/fastapi-types-example.py) |
+| What does AI-generated backend code get wrong? | [`10-reference/ai-code-pitfalls.md`](10-reference/ai-code-pitfalls.md) |
 | How do I move slow work out of the request cycle? | [`11-background-jobs`](11-background-jobs/) |
 | How do I stream tokens to the browser as they're produced? | [`12-streaming`](12-streaming/) |
 | How do I debug "what happened" across five layers? | [`13-observability`](13-observability/) |
 | How do I accept a 500 MB upload without crashing? | [`14-file-uploads`](14-file-uploads/) |
 | How do I stop money from vanishing when step 2 fails? | [`15-transactions`](15-transactions/) |
-| What does AI-generated backend code get wrong? | [`10-reference/ai-code-pitfalls.md`](10-reference/ai-code-pitfalls.md) |
+| How do I stop a retried request from charging twice? | [`16-idempotency`](16-idempotency/) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -85,7 +86,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Every code lesson has an exercise** so you do more than read.
 - **Every code lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
 - **CI checks that the code compiles** on every push.
-- **Nine runnable lessons have executed output** shown in their READMEs.
+- **Ten runnable lessons have executed output** shown in their READMEs.
 - **Reference docs** answer the "which one should I pick?" questions that don't fit in a 15-minute lesson.
 
 **Do not expect:**
@@ -133,6 +134,7 @@ flowchart LR
     M --> N[13 Observability]
     N --> O[14 File uploads]
     O --> P[15 Transactions]
+    P --> Q[16 Idempotency]
     E --> I[05 Glossary]
     I -. look up any term .-> B
 ```
@@ -392,12 +394,36 @@ Two endpoints: one writes without a transaction (money vanishes), one wraps both
 **Verified output (executed):**
 
 ```text
-Baseline:              {"alice":100,"bob":50}
-Broken + failure:      {"alice": 70,"bob":50}   <- $30 vanished
-Safe   + failure:      {"alice":100,"bob":50}   <- nothing changed
+Baseline:         {"alice":100,"bob":50}
+Broken + failure: {"alice": 70,"bob":50}   <- $30 vanished
+Safe   + failure: {"alice":100,"bob":50}   <- nothing changed
 ```
 
 **This is the single most common AI-generated backend bug.**
+
+### [`16-idempotency/`](16-idempotency/) - Retries without double-charging
+
+Transactions make a single operation atomic. Idempotency makes a *retried* operation safe. The `Idempotency-Key` header tells the server "this is the same request as before" — the server returns the stored response instead of running the handler again.
+
+| File | What it is |
+|---|---|
+| [`16-idempotency/README.md`](16-idempotency/README.md) | The problem, the mechanism, and why AI apps are retry-heavy |
+| [`16-idempotency/01-fastapi-idempotency/README.md`](16-idempotency/01-fastapi-idempotency/README.md) | Walkthrough: same key twice, one charge |
+| [`16-idempotency/01-fastapi-idempotency/main.py`](16-idempotency/01-fastapi-idempotency/main.py) | `seen_keys` table + header check + stored response |
+| [`16-idempotency/01-fastapi-idempotency/requirements.txt`](16-idempotency/01-fastapi-idempotency/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):**
+
+```text
+First charge  (key demo-key-1): charge_id=1
+Retry         (key demo-key-1): charge_id=1  <- same, no new charge
+GET /charges:                   [{id:1, user:"alice", amount:50}]
+New key       (key demo-key-2): charge_id=2
+GET /charges:                   [{id:1,...}, {id:2,...}]
+No key:                         400 {"detail":"missing Idempotency-Key header"}
+```
+
+**Two identical requests, one charge.** That is the whole guarantee.
 
 ---
 
@@ -432,6 +458,10 @@ curl -s http://127.0.0.1:8015/balances
 
 **Same failure. Same amount. Different outcome.** That is the whole guarantee.
 
+The **idempotency** lesson (`16-`) shows the other half: two identical
+charge requests with the same `Idempotency-Key` result in **one** charge.
+The user is never billed twice, even when the client retries.
+
 The other runnable lessons are equally verifiable. See each lesson's README for the exact commands. In short:
 
 - **RBAC** (`03-`) — admin gets 200, user gets 403, no token gets 401
@@ -441,6 +471,7 @@ The other runnable lessons are equally verifiable. See each lesson's README for 
 - **Streaming** (`12-`) — browser shows words one per second
 - **Observability** (`13-`) — every log line carries the same `request_id`
 - **File uploads** (`14-`) — both endpoints save 5 MB; only memory differs
+- **Idempotency** (`16-`) — same key twice, one charge
 
 ---
 
@@ -473,7 +504,6 @@ See **[`CONTRIBUTING.md`](CONTRIBUTING.md)** for the full recipe format. The sho
 
 - WebSockets (the bidirectional counterpart to SSE)
 - Webhooks (inbound HTTP from third parties)
-- Idempotency keys (making retries safe)
 - Search (full-text vs vector vs hybrid)
 - Deploy (Docker + one cloud, one provider)
 
@@ -496,12 +526,136 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 
 ---
 
+## Complete file tree
+
+```
+agentic-backend-cookbook/
+├── README.md
+├── LICENSE
+├── CONTRIBUTING.md
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       ├── check-python.yml
+│       └── check-typescript.yml
+├── assets/
+│   └── logo.svg
+├── 00-roadmap/
+│   └── README.md
+├── 01-api-design/
+│   ├── README.md
+│   ├── 01-http-typescript/
+│   │   ├── README.md
+│   │   └── example.ts
+│   └── 02-crud-model/
+│       ├── README.md
+│       └── example.ts
+├── 02-mcp-connectors/
+│   ├── README.md
+│   └── 01-minimal-mcp-server/
+│       ├── README.md
+│       ├── package.json
+│       ├── package-lock.json
+│       └── server.ts
+├── 03-rbac-admin/
+│   ├── README.md
+│   └── 01-fastapi-rbac/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 04-databases/
+│   ├── README.md
+│   ├── 01-database-comparison.md
+│   ├── 02-postgres-crud/
+│   │   ├── README.md
+│   │   ├── schema.sql
+│   │   └── crud.py
+│   ├── 03-mysql-crud/
+│   │   ├── README.md
+│   │   └── crud.py
+│   ├── 04-mongodb-crud/
+│   │   ├── README.md
+│   │   └── crud.py
+│   └── 05-dynamodb-crud/
+│       ├── README.md
+│       └── crud.py
+├── 05-glossary/
+│   └── README.md
+├── 06-caching/
+│   ├── README.md
+│   └── 01-fastapi-cache/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 07-rate-limiting/
+│   ├── README.md
+│   └── 01-fastapi-rate-limit/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 08-documentation/
+│   ├── README.md
+│   ├── api-spec-template.md
+│   └── example-spec.md
+├── 09-agent-harness/
+│   ├── README.md
+│   └── 01-minimal-harness/
+│       ├── README.md
+│       └── main.py
+├── 10-reference/
+│   ├── README.md
+│   ├── database-types.md
+│   ├── api-styles.md
+│   ├── fastapi-types-example.py
+│   └── ai-code-pitfalls.md
+├── 11-background-jobs/
+│   ├── README.md
+│   └── 01-minimal-queue/
+│       ├── README.md
+│       └── main.py
+├── 12-streaming/
+│   ├── README.md
+│   └── 01-fastapi-sse/
+│       ├── README.md
+│       ├── requirements.txt
+│       ├── main.py
+│       └── client.html
+├── 13-observability/
+│   ├── README.md
+│   └── 01-fastapi-request-id/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 14-file-uploads/
+│   ├── README.md
+│   └── 01-fastapi-upload/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 15-transactions/
+│   ├── README.md
+│   └── 01-fastapi-transaction/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+└── 16-idempotency/
+    ├── README.md
+    └── 01-fastapi-idempotency/
+        ├── README.md
+        ├── requirements.txt
+        └── main.py
+```
+
+**17 sections · ~85 tracked files · 10 verified runnable lessons**
+
+---
+
 ## Stack
 
 | Layer | Language / tool | Why |
 |---|---|---|
 | API and MCP lessons | **TypeScript / Node** | Types show the concept and are easy to skim |
-| RBAC, caching, rate limiting, streaming, observability, file uploads, transactions | **Python / FastAPI** | Cleanest pattern for each |
+| RBAC, caching, rate limiting, streaming, observability, file uploads, transactions, idempotency | **Python / FastAPI** | Cleanest pattern for each |
 | Background jobs | **Python (stdlib + SQLite)** | The loop is plain Python; no deps needed |
 | Agent harness | **Python (stdlib only)** | The loop is plain Python; no deps needed |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
