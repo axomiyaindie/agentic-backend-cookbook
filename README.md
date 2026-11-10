@@ -1,4 +1,3 @@
-```
 <div align="center">
 
 <img src="assets/logo.svg" alt="Agentic Backend Cookbook" width="100%" />
@@ -412,4 +411,3 @@ It is the only signal that tells other learners the examples are worth their tim
 MIT License. See [`LICENSE`](LICENSE). Use it, fork it, teach with it.
 
 </div>
-```
