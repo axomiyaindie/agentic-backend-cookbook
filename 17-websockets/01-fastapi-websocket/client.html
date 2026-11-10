@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WebSocket demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      color: #1f2937;
+    }
+    h1 { font-size: 1.5rem; }
+    #status {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+    #status.open  { background: #dcfce7; color: #166534; }
+    #status.closed { background: #fee2e2; color: #991b1b; }
+    #log {
+      min-height: 12rem;
+      max-height: 24rem;
+      overflow-y: auto;
+      padding: 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f9fafb;
+      font-family: ui-monospace, monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      margin-top: 1rem;
+    }
+    .tick   { color: #6b7280; }
+    .you    { color: #1d4ed8; font-weight: 600; }
+    .echo   { color: #15803d; font-weight: 600; }
+    .system { color: #b91c1c; }
+    #controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    #msg {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+    }
+    button:hover { background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <h1>WebSocket demo <span id="status">Connecting…</span></h1>
+  <p>
+    The server sends a tick every second, and the client can also send
+    messages that get echoed back. Both directions on the same connection
+    — that's WebSocket.
+  </p>
+
+  <div id="log"></div>
+
+  <div id="controls">
+    <input id="msg" type="text" placeholder="type a message and press Enter" />
+    <button id="send">Send</button>
+  </div>
+
+  <script>
+    // ────────────────────────────────────────────────────────
+    // The browser's WebSocket API is tiny:
+    //   new WebSocket(url)   -> opens the connection
+    //   ws.onopen            -> fires when accepted
+    //   ws.onmessage         -> fires for every server message
+    //   ws.onclose           -> fires when the connection drops
+    //   ws.send(str)         -> sends a message
+    //
+    // That's the whole client side. Everything below is display.
+    // ────────────────────────────────────────────────────────
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    const url = `${protocol}://${location.host}/ws`;
+
+    const status = document.getElementById("status");
+    const log = document.getElementById("log");
+    const input = document.getElementById("msg");
+    const sendBtn = document.getElementById("send");
+
+    let ws;
+
+    function append(text, cls) {
+      const line = document.createElement("div");
+      line.className = cls;
+      line.textContent = text;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function connect() {
+      status.textContent = "Connecting…";
+      status.className = "";
+      ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        status.textContent = "Connected";
+        status.className = "open";
+        append("[system] connected", "system");
+      };
+
+      ws.onmessage = (event) => {
+        const text = event.data;
+        if (text.startsWith("[tick"))      append(text, "tick");
+        else if (text.startsWith("[echo]")) append(text, "echo");
+        else                                append(text, "tick");
+      };
+
+      ws.onclose = () => {
+        status.textContent = "Disconnected";
+        status.className = "closed";
+        append("[system] disconnected (reconnecting in 2s)", "system");
+        // Reconnect with a small delay. Real apps use exponential
+        // backoff and stop after N attempts; this is the demo version.
+        setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => {
+        status.textContent = "Error";
+        status.className = "closed";
+      };
+    }
+
+    function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        append("[system] not connected", "system");
+        return;
+      }
+      ws.send(text);
+      append(`[you] ${text}`, "you");
+      input.value = "";
+    }
+
+    sendBtn.addEventListener("click", send);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") send();
+    });
+
+    connect();
+  </script>
+</body>
+</html>
