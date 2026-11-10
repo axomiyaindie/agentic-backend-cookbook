@@ -10,7 +10,7 @@
 # read.
 #
 # Run with:
-#   pip install fastapi uvicorn pydantic
+#   pip install fastapi uvicorn "pydantic[email]"
 #   uvicorn fastapi-types-example:app --reload
 # Then open http://127.0.0.1:8000/docs
 # ─────────────────────────────────────────────────────────────
