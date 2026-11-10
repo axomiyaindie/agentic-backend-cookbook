@@ -1,3 +1,4 @@
+```
 <div align="center">
 
 <img src="assets/logo.svg" alt="Agentic Backend Cookbook" width="100%" />
@@ -45,6 +46,7 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | How do I make an expensive endpoint fast? | [`06-caching`](06-caching/) |
 | How do I stop one client from using up all my capacity? | [`07-rate-limiting`](07-rate-limiting/) |
 | How do I write the API doc the frontend (or an AI) will actually use? | [`08-documentation`](08-documentation/) |
+| How does an AI agent actually call tools in a loop? | [`09-agent-harness`](09-agent-harness/) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -75,7 +77,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Every code lesson has an exercise** so you do more than read.
 - **Every code lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
 - **CI checks that the code compiles** on every push.
-- **Executed output** is shown in the RBAC and MCP lessons.
+- **Executed output** is shown in the RBAC, MCP, and agent-harness lessons.
 
 **Do not expect:**
 
@@ -85,6 +87,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Coverage of everything.** This is backend basics, not the whole backend.
 - **Performance or scale.** Examples are correct, not tuned.
 - **Multi-server behavior.** The caching and rate-limiting lessons keep state in process memory, which stops working the moment you run more than one server process. Production needs a shared store such as Redis.
+- **Real model calls.** The agent-harness lesson uses a fake LLM so it runs without an API key and produces the same output every time.
 - **CI for databases.** Those lessons need live databases and are marked as not CI-tested.
 
 If you want a production template, this is the wrong repo. If you want to **understand** what a production template does, you are in the right place.
@@ -113,6 +116,7 @@ flowchart LR
     E --> F[06 Caching]
     F --> G[07 Rate limiting]
     G --> H[08 Documentation]
+    H --> J[09 Agent harness]
     E --> I[05 Glossary]
     I -. look up any term .-> B
 ```
@@ -246,6 +250,29 @@ A fill-in-the-blanks API spec template, plus a fully worked example that documen
 | [`08-documentation/api-spec-template.md`](08-documentation/api-spec-template.md) | Copy-paste template for documenting one endpoint |
 | [`08-documentation/example-spec.md`](08-documentation/example-spec.md) | The RBAC lesson, fully documented |
 
+### [`09-agent-harness/`](09-agent-harness/) - The agent loop
+
+The runtime that sits between the model and your tools. The model never executes code — it only decides what to call. The harness is the loop that actually does the calling, feeds results back, and stops when the model says "done."
+
+| File | What it is |
+|---|---|
+| [`09-agent-harness/README.md`](09-agent-harness/README.md) | What a harness is, and how it differs from MCP |
+| [`09-agent-harness/01-minimal-harness/README.md`](09-agent-harness/01-minimal-harness/README.md) | Walkthrough of a 3-turn agent loop |
+| [`09-agent-harness/01-minimal-harness/main.py`](09-agent-harness/01-minimal-harness/main.py) | Hand-written harness with a fake LLM, no API key |
+
+**Verified output (executed):**
+
+```text
+--- turn 1 --- model wants: tool 'add' with {'a': 2, 'b': 3}
+             tool result: 5
+--- turn 2 --- model wants: tool 'multiply' with {'a': 5, 'b': 10}
+             tool result: 50
+--- turn 3 --- model wants: final answer: 'The answer is 50.'
+--- final --- The answer is 50.
+```
+
+**No `requirements.txt`** — this lesson uses only the Python standard library. The LLM is fake so the loop is deterministic; swapping in a real model changes one function, not the loop.
+
 ---
 
 ## Verify it yourself
@@ -287,6 +314,14 @@ cd 02-mcp-connectors/01-minimal-mcp-server
 npm install
 npx tsx server.ts
 # prints the tools/list schema and { sum: 5 }
+```
+
+The agent-harness lesson also needs no external services:
+
+```bash
+cd 09-agent-harness/01-minimal-harness
+python main.py
+# prints a 3-turn loop ending in: The answer is 50.
 ```
 
 The caching lesson (the second call is instant) and the rate-limiting lesson (the 6th request returns 429) follow the same pattern. See their READMEs for the exact commands.
@@ -336,7 +371,6 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 | File | What it is |
 |---|---|
 | [`README.md`](README.md) | This file |
-| [`assets/logo.svg`](assets/logo.svg) | Banner and logo |
 | [`LICENSE`](LICENSE) | MIT: free to use, fork, teach with |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Recipe format for new lessons |
 | [`.gitignore`](.gitignore) | What not to commit |
@@ -351,6 +385,7 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 |---|---|---|
 | API and MCP lessons | **TypeScript / Node** | Types show the concept and are easy to skim |
 | RBAC, caching, rate-limiting lessons | **Python / FastAPI** | Cleanest pattern for each |
+| Agent harness lesson | **Python (stdlib only)** | The loop is plain Python; no deps needed |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
 | Documentation lesson | **Markdown** | The contract is a document, not code |
 
@@ -377,3 +412,4 @@ It is the only signal that tells other learners the examples are worth their tim
 MIT License. See [`LICENSE`](LICENSE). Use it, fork it, teach with it.
 
 </div>
+```
