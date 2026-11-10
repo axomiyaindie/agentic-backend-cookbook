@@ -1,8 +1,8 @@
-Perfect. **B it is.** Starting fresh from FILE 3, with the language-neutral footer baked into every lesson README.
+✅ FILE 2 pushed: `d657d20..bcb18fb`. Now the first language-footer README is live.
 
 ---
 
-## FILE 3 of 26
+## FILE 3 of 27
 
 **Path:**
 ```
