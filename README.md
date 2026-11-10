@@ -46,6 +46,9 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | How do I stop one client from using up all my capacity? | [`07-rate-limiting`](07-rate-limiting/) |
 | How do I write the API doc the frontend (or an AI) will actually use? | [`08-documentation`](08-documentation/) |
 | How does an AI agent actually call tools in a loop? | [`09-agent-harness`](09-agent-harness/) |
+| Which database type fits my data? | [`10-reference/database-types.md`](10-reference/database-types.md) |
+| REST, GraphQL, gRPC, or SOAP — which one? | [`10-reference/api-styles.md`](10-reference/api-styles.md) |
+| How do I actually write typed models in FastAPI? | [`10-reference/fastapi-types-example.py`](10-reference/fastapi-types-example.py) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -77,6 +80,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Every code lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
 - **CI checks that the code compiles** on every push.
 - **Executed output** is shown in the RBAC, MCP, and agent-harness lessons.
+- **Reference docs** answer the "which one should I pick?" questions that don't fit in a 15-minute lesson.
 
 **Do not expect:**
 
@@ -88,6 +92,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Multi-server behavior.** The caching and rate-limiting lessons keep state in process memory, which stops working the moment you run more than one server process. Production needs a shared store such as Redis.
 - **Real model calls.** The agent-harness lesson uses a fake LLM so it runs without an API key and produces the same output every time.
 - **CI for databases.** Those lessons need live databases and are marked as not CI-tested.
+- **Runnable GraphQL/gRPC/SOAP.** The API styles reference explains them; only REST is taught as a runnable lesson. Each other style needs its own client and tooling, which breaks the 15-minute rule.
 
 If you want a production template, this is the wrong repo. If you want to **understand** what a production template does, you are in the right place.
 
@@ -116,6 +121,7 @@ flowchart LR
     F --> G[07 Rate limiting]
     G --> H[08 Documentation]
     H --> J[09 Agent harness]
+    J --> K[10 Reference]
     E --> I[05 Glossary]
     I -. look up any term .-> B
 ```
@@ -272,6 +278,28 @@ The runtime that sits between the model and your tools. The model never executes
 
 **No `requirements.txt`** — this lesson uses only the Python standard library. The LLM is fake so the loop is deterministic; swapping in a real model changes one function, not the loop.
 
+### [`10-reference/`](10-reference/) - Lookup docs
+
+Comparison docs, not runnable lessons. Read these when you need to answer "which one should I pick?" — not when you want to code.
+
+| File | What it is |
+|---|---|
+| [`10-reference/README.md`](10-reference/README.md) | How to use the reference section |
+| [`10-reference/database-types.md`](10-reference/database-types.md) | Six database families with real companies and pricing |
+| [`10-reference/api-styles.md`](10-reference/api-styles.md) | REST, GraphQL, gRPC, SOAP — when to pick each, with real requests |
+| [`10-reference/fastapi-types-example.py`](10-reference/fastapi-types-example.py) | Runnable Pydantic models: create, response, nested, pagination, patch |
+
+**One file is runnable.** `fastapi-types-example.py` is the only executable file in this section — the two `.md` files are read-only reference. Run it with:
+
+```bash
+cd 10-reference
+pip install fastapi uvicorn "pydantic[email]"
+uvicorn fastapi-types-example:app --reload
+# open http://127.0.0.1:8000/docs
+```
+
+**Why the two `.md` files aren't lessons:** "Which database should I use?" and "REST vs GraphQL" have no 15-minute answer. They are design decisions, not syntax you learn by running a file. The reference docs give you the vocabulary; the lessons (`04-databases`, `01-api-design`) give you the practice.
+
 ---
 
 ## Verify it yourself
@@ -321,6 +349,15 @@ The agent-harness lesson also needs no external services:
 cd 09-agent-harness/01-minimal-harness
 python main.py
 # prints a 3-turn loop ending in: The answer is 50.
+```
+
+The Pydantic reference file needs one extra install:
+
+```bash
+cd 10-reference
+pip install fastapi uvicorn "pydantic[email]"
+uvicorn fastapi-types-example:app --reload
+# open http://127.0.0.1:8000/docs — the schemas are generated from the Pydantic models
 ```
 
 The caching lesson (the second call is instant) and the rate-limiting lesson (the 6th request returns 429) follow the same pattern. See their READMEs for the exact commands.
@@ -387,6 +424,7 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 | Agent harness lesson | **Python (stdlib only)** | The loop is plain Python; no deps needed |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
 | Documentation lesson | **Markdown** | The contract is a document, not code |
+| Reference docs | **Markdown + one FastAPI file** | Read-only comparison; one runnable Pydantic example |
 
 **These languages are examples, not requirements.** Each code lesson has an "In another language?" table showing Go, Rust, PHP, Ruby, Java, and C# equivalents.
 
