@@ -29,6 +29,14 @@ Using port 8016. The database is created on first request.
 
 ## Walkthrough — prove it works
 
+> **Windows note:** `curl.exe` with a JSON body fails in PowerShell,
+> because PowerShell strips the quotes before curl sees them. The result
+> is a `JSON decode error` from FastAPI, not a problem with the server.
+> Use `Invoke-RestMethod` for requests with JSON bodies. It's a native
+> PowerShell cmdlet and handles JSON correctly.
+>
+> Simple GETs still work fine with `curl.exe`.
+
 **Step 1: Start the server**
 
 ```powershell
@@ -48,10 +56,10 @@ Expected: `[]` — no charges yet.
 **Step 3: Charge once with a key**
 
 ```powershell
-curl.exe -s -X POST http://127.0.0.1:8016/charge `
-  -H "Content-Type: application/json" `
-  -H "Idempotency-Key: demo-key-1" `
-  -d '{\"amount\": 50, \"user\": \"alice\"}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8016/charge `
+  -ContentType "application/json" `
+  -Headers @{"Idempotency-Key"="demo-key-1"} `
+  -Body '{"amount": 50, "user": "alice"}'
 ```
 
 Expected:
@@ -72,13 +80,13 @@ Expected: **one** charge.
 Send **exactly the same request** again:
 
 ```powershell
-curl.exe -s -X POST http://127.0.0.1:8016/charge `
-  -H "Content-Type: application/json" `
-  -H "Idempotency-Key: demo-key-1" `
-  -d '{\"amount\": 50, \"user\": \"alice\"}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8016/charge `
+  -ContentType "application/json" `
+  -Headers @{"Idempotency-Key"="demo-key-1"} `
+  -Body '{"amount": 50, "user": "alice"}'
 ```
 
-Expected: **the exact same response**:
+Expected: **the exact same response** — same `charge_id` as Step 3:
 ```json
 {"status":"charged","charge_id":1,"amount":50,"user":"alice"}
 ```
@@ -90,15 +98,16 @@ curl.exe -s http://127.0.0.1:8016/charges
 ```
 
 Expected: **still one charge.** The server did **not** run the handler
-again — it returned the stored response.
+again — it returned the stored response. Without idempotency, this step
+would have created a second charge and the user would be billed twice.
 
 **Step 5: Send again with a NEW key**
 
 ```powershell
-curl.exe -s -X POST http://127.0.0.1:8016/charge `
-  -H "Content-Type: application/json" `
-  -H "Idempotency-Key: demo-key-2" `
-  -d '{\"amount\": 50, \"user\": \"alice\"}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8016/charge `
+  -ContentType "application/json" `
+  -Headers @{"Idempotency-Key"="demo-key-2"} `
+  -Body '{"amount": 50, "user": "alice"}'
 ```
 
 Expected:
@@ -112,16 +121,36 @@ server treated it as a new operation.
 **Step 6: Send without any key**
 
 ```powershell
-curl.exe -s -X POST http://127.0.0.1:8016/charge `
-  -H "Content-Type: application/json" `
-  -d '{\"amount\": 50, \"user\": \"alice\"}'
+try {
+  Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8016/charge `
+    -ContentType "application/json" `
+    -Body '{"amount": 50, "user": "alice"}'
+} catch {
+  $_.Exception.Response.StatusCode.value__
+  $_.ErrorDetails.Message
+}
 ```
 
-Expected: **400** with `{"detail":"missing Idempotency-Key header"}`.
+Expected:
+```text
+400
+{"detail":"missing Idempotency-Key header"}
+```
 
 **That's the difference between "safe by default" and "safe if the client
 remembers".** Requiring the header turns a client bug into a clear error
 message, not a silent double-charge.
+
+**Step 7: Inspect the key table**
+
+```powershell
+curl.exe -s http://127.0.0.1:8016/keys
+```
+
+Expected: two keys, both `completed`:
+```json
+[{"key":"demo-key-1","status":"completed"},{"key":"demo-key-2","status":"completed"}]
+```
 
 ## The three lines that matter
 
@@ -131,8 +160,8 @@ if existing and existing["status"] == "completed":
     return existing["response"]                    # ← the fix
 ```
 
-Three lines. Delete them and the lesson's step 4 charges the user twice.
-Keep them and the retry is harmless.
+Three lines. Delete them and Step 4 charges the user twice. Keep them and
+the retry is harmless.
 
 ## Why store the response body, not just the key
 
@@ -191,6 +220,28 @@ the code path exists and is one line.
 
 Each of those is a lesson of its own. The mechanism in this lesson — key,
 lookup, store, return — is the seed of all of them.
+
+## Testing note: why not `curl.exe`?
+
+On Windows PowerShell, this:
+
+```powershell
+curl.exe -X POST ... -d '{\"amount\":50}'
+```
+
+does **not** send the JSON you expect. PowerShell strips the inner quotes
+before passing the string to `curl.exe`, so FastAPI sees `{amount:50}`
+and returns `{"type":"json_invalid","msg":"JSON decode error"}`.
+
+Three things that **do** work:
+
+1. `Invoke-RestMethod` (used above) — the idiomatic PowerShell client.
+2. `curl.exe --data-raw "{\`"amount\`":50}"` — escaping **with backticks**,
+   not backslashes. Ugly but works.
+3. Running from `cmd.exe` or Git Bash instead of PowerShell.
+
+This lesson uses `Invoke-RestMethod` because it's the clearest, and it
+works on every Windows PowerShell version.
 
 ---
 
