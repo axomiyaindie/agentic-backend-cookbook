@@ -1,4 +1,3 @@
-```
 <div align="center">
 
 <img src="assets/logo.svg" alt="Agentic Backend Cookbook" width="100%" />
@@ -45,7 +44,7 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | What does that word actually mean? | [`05-glossary`](05-glossary/) |
 | How do I make an expensive endpoint fast? | [`06-caching`](06-caching/) |
 | How do I stop one client from using up all my capacity? | [`07-rate-limiting`](07-rate-limiting/) |
-| How do I write the API doc the frontend (or AI) will actually use? | [`08-documentation`](08-documentation/) |
+| How do I write the API doc the frontend (or an AI) will actually use? | [`08-documentation`](08-documentation/) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -71,10 +70,10 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 
 **You can count on:**
 
-- **Every lesson runs.** No "trust me, this works."
-- **Every lesson has a README** that explains what it does and why.
-- **Every lesson has an exercise** so you do more than read.
-- **Every lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
+- **Every lesson is explained.** Each has a README covering what it does and why.
+- **Every code lesson runs.** No "trust me, this works."
+- **Every code lesson has an exercise** so you do more than read.
+- **Every code lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
 - **CI checks that the code compiles** on every push.
 - **Executed output** is shown in the RBAC and MCP lessons.
 
@@ -85,6 +84,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **A full app.** No frontend, no deployment, no Docker.
 - **Coverage of everything.** This is backend basics, not the whole backend.
 - **Performance or scale.** Examples are correct, not tuned.
+- **Multi-server behavior.** The caching and rate-limiting lessons keep state in process memory, which stops working the moment you run more than one server process. Production needs a shared store such as Redis.
 - **CI for databases.** Those lessons need live databases and are marked as not CI-tested.
 
 If you want a production template, this is the wrong repo. If you want to **understand** what a production template does, you are in the right place.
@@ -221,6 +221,8 @@ The cache-aside pattern with TTL, demonstrated with a 2-second fake "expensive o
 | [`06-caching/01-fastapi-cache/main.py`](06-caching/01-fastapi-cache/main.py) | Hand-written cache with TTL: see the mechanism, not a decorator |
 | [`06-caching/01-fastapi-cache/requirements.txt`](06-caching/01-fastapi-cache/requirements.txt) | `fastapi` and `uvicorn` |
 
+**Production note:** the cache lives in process memory. Run two workers and each gets its own cache. Real systems use a shared store such as Redis.
+
 ### [`07-rate-limiting/`](07-rate-limiting/) - Survive traffic spikes
 
 The fixed-window algorithm, hand-written so you can see the counter increment. Demonstrates HTTP 429, `Retry-After`, and the `X-RateLimit-*` headers that tell a client when to back off.
@@ -232,9 +234,11 @@ The fixed-window algorithm, hand-written so you can see the counter increment. D
 | [`07-rate-limiting/01-fastapi-rate-limit/main.py`](07-rate-limiting/01-fastapi-rate-limit/main.py) | Hand-written limiter with `X-RateLimit-*` headers |
 | [`07-rate-limiting/01-fastapi-rate-limit/requirements.txt`](07-rate-limiting/01-fastapi-rate-limit/requirements.txt) | `fastapi` and `uvicorn` |
 
+**Production note:** the counters live in process memory, so limits reset on restart and are not shared across workers. Real systems keep counters in a shared store such as Redis.
+
 ### [`08-documentation/`](08-documentation/) - The contract
 
-A fill-in-the-blanks API spec template, plus a fully worked example that documents the RBAC lesson from `03-rbac-admin/`. Shows 401 vs 403, error shapes, and the one-paragraph summary table readers actually use.
+A fill-in-the-blanks API spec template, plus a fully worked example that documents the RBAC lesson from `03-rbac-admin/`. Shows 401 vs 403, error shapes, and the one-paragraph summary table readers actually use. This lesson is a writing exercise, so it has no code to run.
 
 | File | What it is |
 |---|---|
@@ -285,7 +289,7 @@ npx tsx server.ts
 # prints the tools/list schema and { sum: 5 }
 ```
 
-The caching lesson (second call is instant) and the rate limiting lesson (the 6th request returns 429) follow the same pattern — see their READMEs for exact commands.
+The caching lesson (the second call is instant) and the rate-limiting lesson (the 6th request returns 429) follow the same pattern. See their READMEs for the exact commands.
 
 ---
 
@@ -346,10 +350,11 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 | Layer | Language / tool | Why |
 |---|---|---|
 | API and MCP lessons | **TypeScript / Node** | Types show the concept and are easy to skim |
-| RBAC, caching, rate limiting lessons | **Python / FastAPI** | Cleanest pattern for each |
+| RBAC, caching, rate-limiting lessons | **Python / FastAPI** | Cleanest pattern for each |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
+| Documentation lesson | **Markdown** | The contract is a document, not code |
 
-**These languages are examples, not requirements.** Each lesson has an "In another language?" table showing Go, Rust, PHP, Ruby, Java, and C# equivalents.
+**These languages are examples, not requirements.** Each code lesson has an "In another language?" table showing Go, Rust, PHP, Ruby, Java, and C# equivalents.
 
 ---
 
@@ -372,4 +377,3 @@ It is the only signal that tells other learners the examples are worth their tim
 MIT License. See [`LICENSE`](LICENSE). Use it, fork it, teach with it.
 
 </div>
-```
