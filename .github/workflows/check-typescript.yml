@@ -1,0 +1,39 @@
+name: Check TypeScript
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.ts'
+      - '.github/workflows/check-typescript.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.ts'
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lesson:
+          - 01-api-design/01-http-typescript
+          - 01-api-design/02-crud-model
+          - 02-mcp-connectors/01-minimal-mcp-server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Type-check ${{ matrix.lesson }}
+        working-directory: ${{ matrix.lesson }}
+        run: |
+          set -e
+          npx --yes tsc --noEmit --strict --target ES2022 --module ESNext \
+            --moduleResolution bundler \
+            *.ts
+          echo "Type-check passed for ${{ matrix.lesson }}"
