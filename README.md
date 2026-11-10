@@ -49,6 +49,12 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | Which database type fits my data? | [`10-reference/database-types.md`](10-reference/database-types.md) |
 | REST, GraphQL, gRPC, or SOAP — which one? | [`10-reference/api-styles.md`](10-reference/api-styles.md) |
 | How do I actually write typed models in FastAPI? | [`10-reference/fastapi-types-example.py`](10-reference/fastapi-types-example.py) |
+| How do I move slow work out of the request cycle? | [`11-background-jobs`](11-background-jobs/) |
+| How do I stream tokens to the browser as they're produced? | [`12-streaming`](12-streaming/) |
+| How do I debug "what happened" across five layers? | [`13-observability`](13-observability/) |
+| How do I accept a 500 MB upload without crashing? | [`14-file-uploads`](14-file-uploads/) |
+| How do I stop money from vanishing when step 2 fails? | [`15-transactions`](15-transactions/) |
+| What does AI-generated backend code get wrong? | [`10-reference/ai-code-pitfalls.md`](10-reference/ai-code-pitfalls.md) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -79,7 +85,7 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Every code lesson has an exercise** so you do more than read.
 - **Every code lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
 - **CI checks that the code compiles** on every push.
-- **Executed output** is shown in the RBAC, MCP, and agent-harness lessons.
+- **Nine runnable lessons have executed output** shown in their READMEs.
 - **Reference docs** answer the "which one should I pick?" questions that don't fit in a 15-minute lesson.
 
 **Do not expect:**
@@ -89,10 +95,10 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **A full app.** No frontend, no deployment, no Docker.
 - **Coverage of everything.** This is backend basics, not the whole backend.
 - **Performance or scale.** Examples are correct, not tuned.
-- **Multi-server behavior.** The caching and rate-limiting lessons keep state in process memory, which stops working the moment you run more than one server process. Production needs a shared store such as Redis.
+- **Multi-server behavior.** Caching, rate limiting, and background jobs keep state in process memory. Real systems use Redis or a shared store.
 - **Real model calls.** The agent-harness lesson uses a fake LLM so it runs without an API key and produces the same output every time.
 - **CI for databases.** Those lessons need live databases and are marked as not CI-tested.
-- **Runnable GraphQL/gRPC/SOAP.** The API styles reference explains them; only REST is taught as a runnable lesson. Each other style needs its own client and tooling, which breaks the 15-minute rule.
+- **Runnable GraphQL/gRPC/SOAP.** The API styles reference explains them; only REST is taught as a runnable lesson.
 
 If you want a production template, this is the wrong repo. If you want to **understand** what a production template does, you are in the right place.
 
@@ -122,6 +128,11 @@ flowchart LR
     G --> H[08 Documentation]
     H --> J[09 Agent harness]
     J --> K[10 Reference]
+    K --> L[11 Background jobs]
+    L --> M[12 Streaming]
+    M --> N[13 Observability]
+    N --> O[14 File uploads]
+    O --> P[15 Transactions]
     E --> I[05 Glossary]
     I -. look up any term .-> B
 ```
@@ -221,7 +232,7 @@ Plain-English definitions of every term used in this repo: API, CRUD, RBAC, JWT,
 
 ### [`06-caching/`](06-caching/) - Make expensive endpoints fast
 
-The cache-aside pattern with TTL, demonstrated with a 2-second fake "expensive operation" that becomes instant on the second call. Walk through cache miss, cache hit, TTL expiry, and manual invalidation side by side.
+The cache-aside pattern with TTL, demonstrated with a 2-second fake "expensive operation" that becomes instant on the second call.
 
 | File | What it is |
 |---|---|
@@ -234,7 +245,7 @@ The cache-aside pattern with TTL, demonstrated with a 2-second fake "expensive o
 
 ### [`07-rate-limiting/`](07-rate-limiting/) - Survive traffic spikes
 
-The fixed-window algorithm, hand-written so you can see the counter increment. Demonstrates HTTP 429, `Retry-After`, and the `X-RateLimit-*` headers that tell a client when to back off.
+The fixed-window algorithm, hand-written so you can see the counter increment. Demonstrates HTTP 429, `Retry-After`, and the `X-RateLimit-*` headers.
 
 | File | What it is |
 |---|---|
@@ -243,11 +254,11 @@ The fixed-window algorithm, hand-written so you can see the counter increment. D
 | [`07-rate-limiting/01-fastapi-rate-limit/main.py`](07-rate-limiting/01-fastapi-rate-limit/main.py) | Hand-written limiter with `X-RateLimit-*` headers |
 | [`07-rate-limiting/01-fastapi-rate-limit/requirements.txt`](07-rate-limiting/01-fastapi-rate-limit/requirements.txt) | `fastapi` and `uvicorn` |
 
-**Production note:** the counters live in process memory, so limits reset on restart and are not shared across workers. Real systems keep counters in a shared store such as Redis.
+**Production note:** counters live in process memory. Real systems keep them in Redis.
 
 ### [`08-documentation/`](08-documentation/) - The contract
 
-A fill-in-the-blanks API spec template, plus a fully worked example that documents the RBAC lesson from `03-rbac-admin/`. Shows 401 vs 403, error shapes, and the one-paragraph summary table readers actually use. This lesson is a writing exercise, so it has no code to run.
+A fill-in-the-blanks API spec template, plus a fully worked example that documents the RBAC lesson. Shows 401 vs 403, error shapes, and the summary table readers actually use. This lesson is a writing exercise; no code to run.
 
 | File | What it is |
 |---|---|
@@ -257,7 +268,7 @@ A fill-in-the-blanks API spec template, plus a fully worked example that documen
 
 ### [`09-agent-harness/`](09-agent-harness/) - The agent loop
 
-The runtime that sits between the model and your tools. The model never executes code — it only decides what to call. The harness is the loop that actually does the calling, feeds results back, and stops when the model says "done."
+The runtime that sits between the model and your tools. The model never executes code — it only decides what to call. The harness is the loop that actually does the calling.
 
 | File | What it is |
 |---|---|
@@ -276,91 +287,160 @@ The runtime that sits between the model and your tools. The model never executes
 --- final --- The answer is 50.
 ```
 
-**No `requirements.txt`** — this lesson uses only the Python standard library. The LLM is fake so the loop is deterministic; swapping in a real model changes one function, not the loop.
+**No `requirements.txt`** — this lesson uses only the Python standard library.
 
 ### [`10-reference/`](10-reference/) - Lookup docs
 
-Comparison docs, not runnable lessons. Read these when you need to answer "which one should I pick?" — not when you want to code.
+Comparison docs, not runnable lessons. Read these when you need to answer "which one should I pick?" or "what does AI-generated code get wrong?".
 
 | File | What it is |
 |---|---|
 | [`10-reference/README.md`](10-reference/README.md) | How to use the reference section |
 | [`10-reference/database-types.md`](10-reference/database-types.md) | Six database families with real companies and pricing |
-| [`10-reference/api-styles.md`](10-reference/api-styles.md) | REST, GraphQL, gRPC, SOAP — when to pick each, with real requests |
+| [`10-reference/api-styles.md`](10-reference/api-styles.md) | REST, GraphQL, gRPC, SOAP — when to pick each |
 | [`10-reference/fastapi-types-example.py`](10-reference/fastapi-types-example.py) | Runnable Pydantic models: create, response, nested, pagination, patch |
+| [`10-reference/ai-code-pitfalls.md`](10-reference/ai-code-pitfalls.md) | Nine patterns AI-generated backend code gets wrong, with the fix for each |
 
-**One file is runnable.** `fastapi-types-example.py` is the only executable file in this section — the two `.md` files are read-only reference. Run it with:
+**One file is runnable** (`fastapi-types-example.py`); the rest are read-only reference.
 
-```bash
-cd 10-reference
-pip install fastapi uvicorn "pydantic[email]"
-uvicorn fastapi-types-example:app --reload
-# open http://127.0.0.1:8000/docs
+### [`11-background-jobs/`](11-background-jobs/) - Move slow work out of the request
+
+The producer / queue / worker pattern in a single file, using SQLite. Shows retry, dead-letter, and why every job must be idempotent.
+
+| File | What it is |
+|---|---|
+| [`11-background-jobs/README.md`](11-background-jobs/README.md) | Why jobs exist, the three parts, and the reliability contract |
+| [`11-background-jobs/01-minimal-queue/README.md`](11-background-jobs/01-minimal-queue/README.md) | Walkthrough of the states a job moves through |
+| [`11-background-jobs/01-minimal-queue/main.py`](11-background-jobs/01-minimal-queue/main.py) | Producer + worker + retry + dead-letter, stdlib only |
+
+**Verified output (executed):**
+
+```text
+job 1 (succeed_after_0): status=succeeded, attempts=0
+job 2 (succeed_after_1): status=succeeded, attempts=1   <- retried and recovered
+job 3 (always_fail):     status=dead,      attempts=3   <- dead-lettered
 ```
 
-**Why the two `.md` files aren't lessons:** "Which database should I use?" and "REST vs GraphQL" have no 15-minute answer. They are design decisions, not syntax you learn by running a file. The reference docs give you the vocabulary; the lessons (`04-databases`, `01-api-design`) give you the practice.
+**No `requirements.txt`** — standard library only (SQLite is built in).
+
+### [`12-streaming/`](12-streaming/) - Stream tokens as they are produced
+
+SSE (Server-Sent Events) sends each chunk the moment it is ready. The demo streams 5 words over 5 seconds, and a 30-line HTML page displays them live.
+
+| File | What it is |
+|---|---|
+| [`12-streaming/README.md`](12-streaming/README.md) | SSE vs WebSocket, and why AI chat uses SSE |
+| [`12-streaming/01-fastapi-sse/README.md`](12-streaming/01-fastapi-sse/README.md) | Walkthrough with expected curl output |
+| [`12-streaming/01-fastapi-sse/main.py`](12-streaming/01-fastapi-sse/main.py) | `StreamingResponse` + an async generator |
+| [`12-streaming/01-fastapi-sse/client.html`](12-streaming/01-fastapi-sse/client.html) | Browser client using `EventSource` |
+| [`12-streaming/01-fastapi-sse/requirements.txt`](12-streaming/01-fastapi-sse/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):** the browser displays `Hello from a streaming server!` one word per second, then `Stream ended or connection lost` (the client's `onerror` for a normal close).
+
+### [`13-observability/`](13-observability/) - One ID across every layer
+
+A middleware generates a correlation ID, logs it with every line, and passes it into a background job so the worker logs the same ID after the HTTP request ends.
+
+| File | What it is |
+|---|---|
+| [`13-observability/README.md`](13-observability/README.md) | Logs vs metrics vs traces, and why correlation IDs matter |
+| [`13-observability/01-fastapi-request-id/README.md`](13-observability/01-fastapi-request-id/README.md) | Walkthrough of the four tests |
+| [`13-observability/01-fastapi-request-id/main.py`](13-observability/01-fastapi-request-id/main.py) | Middleware + `ContextVar` + threaded background job |
+| [`13-observability/01-fastapi-request-id/requirements.txt`](13-observability/01-fastapi-request-id/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):**
+
+```text
+{"event":"request_start","request_id":"job-trace-456",...}
+{"event":"job_enqueued","request_id":"job-trace-456",...}
+{"event":"request_end","request_id":"job-trace-456",...}
+{"event":"job_running","request_id":"job-trace-456",...}       <- from the thread
+{"event":"job_succeeded","request_id":"job-trace-456",...}     <- from the thread
+```
+
+### [`14-file-uploads/`](14-file-uploads/) - Don't buffer the whole file
+
+Two endpoints: one reads the whole upload into memory (the anti-pattern), one streams in 1 MB chunks. Same result, 500× less memory.
+
+| File | What it is |
+|---|---|
+| [`14-file-uploads/README.md`](14-file-uploads/README.md) | Why buffering kills servers, and the three patterns |
+| [`14-file-uploads/01-fastapi-upload/README.md`](14-file-uploads/01-fastapi-upload/README.md) | Walkthrough: upload the same file both ways, watch memory |
+| [`14-file-uploads/01-fastapi-upload/main.py`](14-file-uploads/01-fastapi-upload/main.py) | `/upload/buffered` vs `/upload/streamed`, side by side |
+| [`14-file-uploads/01-fastapi-upload/requirements.txt`](14-file-uploads/01-fastapi-upload/requirements.txt) | `fastapi`, `uvicorn`, `python-multipart` |
+
+**Verified output (executed):**
+
+```text
+{"status":"saved","bytes":5242880,"filename":"test-5mb.bin","method":"buffered"}
+{"status":"saved","bytes":5242880,"filename":"test-5mb.bin","method":"streamed"}
+```
+
+Both succeed; the difference only shows up in memory.
+
+### [`15-transactions/`](15-transactions/) - All or nothing
+
+Two endpoints: one writes without a transaction (money vanishes), one wraps both writes in `BEGIN … COMMIT` (money stays safe). The `?fail=1` flag forces the second write to fail.
+
+| File | What it is |
+|---|---|
+| [`15-transactions/README.md`](15-transactions/README.md) | What ACID actually means, and why atomicity is the one AI forgets |
+| [`15-transactions/01-fastapi-transaction/README.md`](15-transactions/01-fastapi-transaction/README.md) | Walkthrough: trigger the failure on both endpoints, watch the balances |
+| [`15-transactions/01-fastapi-transaction/main.py`](15-transactions/01-fastapi-transaction/main.py) | `/transfer/broken` vs `/transfer/safe`, side by side |
+| [`15-transactions/01-fastapi-transaction/requirements.txt`](15-transactions/01-fastapi-transaction/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):**
+
+```text
+Baseline:              {"alice":100,"bob":50}
+Broken + failure:      {"alice": 70,"bob":50}   <- $30 vanished
+Safe   + failure:      {"alice":100,"bob":50}   <- nothing changed
+```
+
+**This is the single most common AI-generated backend bug.**
 
 ---
 
 ## Verify it yourself
 
-The fastest proof that the repo works: run the **RBAC lesson** and watch the 403 appear.
+The fastest proof that the repo works: run the **transaction lesson** and watch the money vanish.
 
 ```bash
-cd 03-rbac-admin/01-fastapi-rbac
+cd 15-transactions/01-fastapi-transaction
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8015
 ```
 
 In a second terminal:
 
 ```bash
-# Admin -> 200 OK
-curl -s -X POST http://127.0.0.1:8000/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
+# Baseline
+curl -s http://127.0.0.1:8015/balances
+# -> {"alice":100,"bob":50}
 
-curl -s http://127.0.0.1:8000/admin/users \
-  -H "Authorization: Bearer token-admin"
+# The bug: no transaction, forced failure
+curl -s -X POST "http://127.0.0.1:8015/transfer/broken?from_id=alice&to_id=bob&amount=30&fail=1"
+curl -s http://127.0.0.1:8015/balances
+# -> {"alice":70,"bob":50}   $30 vanished
 
-# User -> 403 Forbidden  <- this is the point
-curl -s -X POST http://127.0.0.1:8000/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"user","password":"user"}'
-
-curl -s http://127.0.0.1:8000/admin/users \
-  -H "Authorization: Bearer token-user"
+# The fix: transaction, same failure
+curl -s -X POST http://127.0.0.1:8015/reset
+curl -s -X POST "http://127.0.0.1:8015/transfer/safe?from_id=alice&to_id=bob&amount=30&fail=1"
+curl -s http://127.0.0.1:8015/balances
+# -> {"alice":100,"bob":50}  nothing changed
 ```
 
-**200 for admin. 403 for user. That is the whole guarantee.**
+**Same failure. Same amount. Different outcome.** That is the whole guarantee.
 
-The MCP lesson needs no external services:
+The other runnable lessons are equally verifiable. See each lesson's README for the exact commands. In short:
 
-```bash
-cd 02-mcp-connectors/01-minimal-mcp-server
-npm install
-npx tsx server.ts
-# prints the tools/list schema and { sum: 5 }
-```
-
-The agent-harness lesson also needs no external services:
-
-```bash
-cd 09-agent-harness/01-minimal-harness
-python main.py
-# prints a 3-turn loop ending in: The answer is 50.
-```
-
-The Pydantic reference file needs one extra install:
-
-```bash
-cd 10-reference
-pip install fastapi uvicorn "pydantic[email]"
-uvicorn fastapi-types-example:app --reload
-# open http://127.0.0.1:8000/docs — the schemas are generated from the Pydantic models
-```
-
-The caching lesson (the second call is instant) and the rate-limiting lesson (the 6th request returns 429) follow the same pattern. See their READMEs for the exact commands.
+- **RBAC** (`03-`) — admin gets 200, user gets 403, no token gets 401
+- **MCP** (`02-`) — `npx tsx server.ts` prints `{ sum: 5 }`
+- **Agent harness** (`09-`) — `python main.py` prints a 3-turn loop ending in `The answer is 50.`
+- **Background jobs** (`11-`) — `python main.py` retries job 2 and dead-letters job 3
+- **Streaming** (`12-`) — browser shows words one per second
+- **Observability** (`13-`) — every log line carries the same `request_id`
+- **File uploads** (`14-`) — both endpoints save 5 MB; only memory differs
 
 ---
 
@@ -370,7 +450,7 @@ Free to use for all of these (MIT license):
 
 - **Learn:** read a lesson, run it, break it.
 - **Teach:** use it in a class, bootcamp, or study group.
-- **Audit:** before accepting AI-generated backend code, check what it should look like.
+- **Audit:** before accepting AI-generated backend code, check it against [`10-reference/ai-code-pitfalls.md`](10-reference/ai-code-pitfalls.md).
 - **Fork:** strip it down and add your own lessons.
 - **Translate:** port a lesson to your language (see the "In another language?" table in each lesson README).
 - **Contribute:** see below.
@@ -391,12 +471,13 @@ See **[`CONTRIBUTING.md`](CONTRIBUTING.md)** for the full recipe format. The sho
 
 **Good next lessons:**
 
-- Background jobs and queues
-- File uploads and storage
-- WebSockets and streaming
-- Observability (logs, metrics, traces)
+- WebSockets (the bidirectional counterpart to SSE)
+- Webhooks (inbound HTTP from third parties)
+- Idempotency keys (making retries safe)
+- Search (full-text vs vector vs hybrid)
+- Deploy (Docker + one cloud, one provider)
 
-**Bad candidates:** frontend topics, cloud deployment walkthroughs, framework comparisons. This is a backend cookbook, not a general tutorial site.
+**Bad candidates:** frontend topics, framework comparisons, anything that needs a Kubernetes cluster to demonstrate.
 
 PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typo" noise.
 
@@ -420,8 +501,9 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 | Layer | Language / tool | Why |
 |---|---|---|
 | API and MCP lessons | **TypeScript / Node** | Types show the concept and are easy to skim |
-| RBAC, caching, rate-limiting lessons | **Python / FastAPI** | Cleanest pattern for each |
-| Agent harness lesson | **Python (stdlib only)** | The loop is plain Python; no deps needed |
+| RBAC, caching, rate limiting, streaming, observability, file uploads, transactions | **Python / FastAPI** | Cleanest pattern for each |
+| Background jobs | **Python (stdlib + SQLite)** | The loop is plain Python; no deps needed |
+| Agent harness | **Python (stdlib only)** | The loop is plain Python; no deps needed |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
 | Documentation lesson | **Markdown** | The contract is a document, not code |
 | Reference docs | **Markdown + one FastAPI file** | Read-only comparison; one runnable Pydantic example |
