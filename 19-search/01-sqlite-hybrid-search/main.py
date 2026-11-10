@@ -15,6 +15,7 @@
 import hashlib
 import math
 import sqlite3
+import struct
 from pathlib import Path
 
 from fastapi import FastAPI, Query
@@ -79,6 +80,16 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def _pack_embedding(emb: list[float]) -> bytes:
+    # Each float is stored as an 8-byte little-endian double.
+    # `struct` is the right tool: float has no .to_bytes() method.
+    return struct.pack(f"<{len(emb)}d", *emb)
+
+
+def _unpack_embedding(blob: bytes) -> list[float]:
+    return list(struct.unpack(f"<{len(blob) // 8}d", blob))
+
+
 def _init_db():
     conn = _connect()
     try:
@@ -102,11 +113,9 @@ def _init_db():
         # Insert docs and embeddings
         for doc_id, body in DOCS:
             emb = fake_embed(body)
-            # Store as bytes — 8 bytes per float
-            blob = b"".join(x.to_bytes(8, "little", signed=True) for x in emb)
             conn.execute(
                 "INSERT INTO docs (id, body, embedding) VALUES (?, ?, ?)",
-                (doc_id, body, blob),
+                (doc_id, body, _pack_embedding(emb)),
             )
             conn.execute(
                 "INSERT INTO docs_fts (rowid, body) VALUES (?, ?)",
@@ -114,13 +123,6 @@ def _init_db():
             )
     finally:
         conn.close()
-
-
-def _load_embedding(blob: bytes) -> list[float]:
-    return [
-        int.from_bytes(blob[i : i + 8], "little", signed=True) / 10**15
-        for i in range(0, len(blob), 8)
-    ]
 
 
 _init_db()
@@ -156,7 +158,7 @@ def search_vector(query: str, limit: int = 10) -> list[dict]:
         rows = conn.execute("SELECT id, body, embedding FROM docs").fetchall()
     scored = []
     for r in rows:
-        doc_emb = _load_embedding(r["embedding"])
+        doc_emb = _unpack_embedding(r["embedding"])
         scored.append({
             "id": r["id"],
             "body": r["body"],
