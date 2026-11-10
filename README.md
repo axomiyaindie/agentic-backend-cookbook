@@ -56,6 +56,11 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | How do I accept a 500 MB upload without crashing? | [`14-file-uploads`](14-file-uploads/) |
 | How do I stop money from vanishing when step 2 fails? | [`15-transactions`](15-transactions/) |
 | How do I stop a retried request from charging twice? | [`16-idempotency`](16-idempotency/) |
+| How do I push messages from the server to the client in both directions? | [`17-websockets`](17-websockets/) |
+| How do I receive untrusted HTTP from a third party safely? | [`18-webhooks`](18-webhooks/) |
+| Full-text or vector or hybrid — which search? | [`19-search`](19-search/) |
+| How do I get this off my laptop? | [`20-deploy`](20-deploy/) |
+| How do I know the code still works after I change it? | [`21-testing`](21-testing/) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -86,18 +91,19 @@ This repo is the missing middle. It exists to **make backend concepts legible by
 - **Every code lesson has an exercise** so you do more than read.
 - **Every code lesson maps to other languages** (Go, Rust, PHP, Ruby, Java, C#).
 - **CI checks that the code compiles** on every push.
-- **Ten runnable lessons have executed output** shown in their READMEs.
+- **Thirteen runnable lessons have executed output** shown in their READMEs.
 - **Reference docs** answer the "which one should I pick?" questions that don't fit in a 15-minute lesson.
 
 **Do not expect:**
 
-- **Production code.** No hardening, no migrations, no test suites.
+- **Production code.** No hardening, no migrations, no test suites beyond `21-testing/`.
 - **Authentication.** Only authorization (RBAC). No passwords, no OAuth.
-- **A full app.** No frontend, no deployment, no Docker.
+- **A full app.** No frontend, no deployment beyond a Dockerfile template.
 - **Coverage of everything.** This is backend basics, not the whole backend.
 - **Performance or scale.** Examples are correct, not tuned.
-- **Multi-server behavior.** Caching, rate limiting, and background jobs keep state in process memory. Real systems use Redis or a shared store.
-- **Real model calls.** The agent-harness lesson uses a fake LLM so it runs without an API key and produces the same output every time.
+- **Multi-server behavior.** Caching, rate limiting, background jobs, and WebSockets keep state in process memory. Real systems use Redis or a pub/sub layer.
+- **Real model calls.** The agent-harness lesson uses a fake LLM so it runs without an API key.
+- **Real embeddings.** The search lesson uses a deterministic hash so it runs without a model. The README shows how to swap in one.
 - **CI for databases.** Those lessons need live databases and are marked as not CI-tested.
 - **Runnable GraphQL/gRPC/SOAP.** The API styles reference explains them; only REST is taught as a runnable lesson.
 
@@ -135,6 +141,11 @@ flowchart LR
     N --> O[14 File uploads]
     O --> P[15 Transactions]
     P --> Q[16 Idempotency]
+    Q --> R[17 WebSockets]
+    R --> S[18 Webhooks]
+    S --> T[19 Search]
+    T --> U[20 Deploy]
+    U --> V[21 Testing]
     E --> I[05 Glossary]
     I -. look up any term .-> B
 ```
@@ -425,6 +436,92 @@ No key:                         400 {"detail":"missing Idempotency-Key header"}
 
 **Two identical requests, one charge.** That is the whole guarantee.
 
+### [`17-websockets/`](17-websockets/) - Both directions on one connection
+
+SSE is one-way (server → client). WebSocket is two-way. The demo sends a tick every second (server → client) **and** echoes whatever the client types (client → server → client). Both on the same connection.
+
+| File | What it is |
+|---|---|
+| [`17-websockets/README.md`](17-websockets/README.md) | SSE vs WebSocket, when to pick each |
+| [`17-websockets/01-fastapi-websocket/README.md`](17-websockets/01-fastapi-websocket/README.md) | Walkthrough: watch ticks arrive, send a message, get an echo |
+| [`17-websockets/01-fastapi-websocket/main.py`](17-websockets/01-fastapi-websocket/main.py) | `@app.websocket` + background tick loop + receive loop |
+| [`17-websockets/01-fastapi-websocket/client.html`](17-websockets/01-fastapi-websocket/client.html) | Browser client using `new WebSocket(...)` |
+| [`17-websockets/01-fastapi-websocket/requirements.txt`](17-websockets/01-fastapi-websocket/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):** the browser shows a new `[tick N]` line every second, and typing `hello` produces `[you] hello` followed by `[echo] hello` — both directions working on one connection.
+
+### [`18-webhooks/`](18-webhooks/) - Untrusted HTTP, verified
+
+A webhook is HTTP someone else sends to you. The only thing that proves it came from the expected sender is an HMAC signature over the raw body. Without verification, anyone can POST a "charge succeeded" event to your endpoint.
+
+| File | What it is |
+|---|---|
+| [`18-webhooks/README.md`](18-webhooks/README.md) | Why the raw body matters, how HMAC verification works |
+| [`18-webhooks/01-fastapi-webhook/README.md`](18-webhooks/01-fastapi-webhook/README.md) | Walkthrough: valid signature, wrong signature, duplicate event |
+| [`18-webhooks/01-fastapi-webhook/main.py`](18-webhooks/01-fastapi-webhook/main.py) | `await request.body()` + `hmac.compare_digest` + idempotency on event ID |
+| [`18-webhooks/01-fastapi-webhook/requirements.txt`](18-webhooks/01-fastapi-webhook/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):**
+
+```text
+Valid signature:   {"status":"ok","event_id":"evt_001","duplicate":false}
+Same event again:  {"status":"ok","event_id":"evt_001","duplicate":true}
+Wrong signature:   401 {"detail":"invalid signature"}
+```
+
+**The 401 proves the receiver rejects forged requests before doing any work.**
+
+### [`19-search/`](19-search/) - Full-text, vector, or both
+
+Three ranking strategies on the same dataset: SQLite FTS5 (keyword match), cosine similarity over fake embeddings (meaning match), and reciprocal rank fusion of both. The demo query `iPhone power problem` shows each one winning in turn.
+
+| File | What it is |
+|---|---|
+| [`19-search/README.md`](19-search/README.md) | Full-text vs vector vs hybrid, and why production is almost always hybrid |
+| [`19-search/01-sqlite-hybrid-search/README.md`](19-search/01-sqlite-hybrid-search/README.md) | Walkthrough: three queries where each method wins |
+| [`19-search/01-sqlite-hybrid-search/main.py`](19-search/01-sqlite-hybrid-search/main.py) | FTS5 + fake embeddings + RRF, all in ~200 lines |
+| [`19-search/01-sqlite-hybrid-search/requirements.txt`](19-search/01-sqlite-hybrid-search/requirements.txt) | `fastapi` and `uvicorn` |
+
+**Verified output (executed):** for `iPhone power problem`, FTS ranks `Handset has power issues` #1 and `iPhone won't charge` #2; vector ranks `iPhone won't charge` #1 and `Handset has power issues` #4; hybrid puts both at the top — documents each individual method would miss.
+
+**The embeddings are a deterministic hash**, not a real model. The README shows how to swap in `text-embedding-3-small` and change `EMBEDDING_DIM` to 1536.
+
+### [`20-deploy/`](20-deploy/) - Get it off your laptop
+
+Docker and compose templates that deploy any lesson in this repo. Multi-stage build, non-root user, healthcheck, and a full local stack (app + Postgres + Redis) with one command.
+
+| File | What it is |
+|---|---|
+| [`20-deploy/README.md`](20-deploy/README.md) | The seven concerns of deployment, and why this lesson covers the first three |
+| [`20-deploy/01-docker/Dockerfile`](20-deploy/01-docker/Dockerfile) | Multi-stage template: copy into any lesson, change one line |
+| [`20-deploy/01-docker/docker-compose.yml`](20-deploy/01-docker/docker-compose.yml) | App + Postgres (with pgvector) + Redis, all local |
+| [`20-deploy/01-docker/.dockerignore`](20-deploy/01-docker/.dockerignore) | What not to send to the build context |
+
+**No runnable lesson** — these are templates. The Dockerfile is correct for any lesson's `main.py`, and the compose file brings up a full stack in one command.
+
+### [`21-testing/`](21-testing/) - Prove it still works
+
+Tests for the idempotency lesson. Four behaviors, one test each: first charge succeeds, retry doesn't double-charge, new key does, missing key is rejected. Runs in half a second, catches the bug the whole lesson exists to prevent.
+
+| File | What it is |
+|---|---|
+| [`21-testing/README.md`](21-testing/README.md) | Unit vs integration vs e2e, what to test, why pytest |
+| [`21-testing/01-pytest-example/README.md`](21-testing/01-pytest-example/README.md) | Walkthrough of the four tests and the fixture that isolates them |
+| [`21-testing/01-pytest-example/test_idempotency.py`](21-testing/01-pytest-example/test_idempotency.py) | The four tests, using FastAPI's `TestClient` |
+| [`21-testing/01-pytest-example/conftest.py`](21-testing/01-pytest-example/conftest.py) | sys.path setup + database reset before each test |
+| [`21-testing/01-pytest-example/requirements.txt`](21-testing/01-pytest-example/requirements.txt) | `fastapi`, `uvicorn`, `pytest`, `httpx` |
+
+**Verified output (executed):**
+
+```text
+test_idempotency.py::test_first_charge_succeeds PASSED
+test_idempotency.py::test_same_key_does_not_double_charge PASSED
+test_idempotency.py::test_different_key_creates_new_charge PASSED
+test_idempotency.py::test_missing_key_is_rejected PASSED
+
+4 passed in 0.51s
+```
+
 ---
 
 ## Verify it yourself
@@ -458,11 +555,7 @@ curl -s http://127.0.0.1:8015/balances
 
 **Same failure. Same amount. Different outcome.** That is the whole guarantee.
 
-The **idempotency** lesson (`16-`) shows the other half: two identical
-charge requests with the same `Idempotency-Key` result in **one** charge.
-The user is never billed twice, even when the client retries.
-
-The other runnable lessons are equally verifiable. See each lesson's README for the exact commands. In short:
+The other runnable lessons are equally verifiable. In short:
 
 - **RBAC** (`03-`) — admin gets 200, user gets 403, no token gets 401
 - **MCP** (`02-`) — `npx tsx server.ts` prints `{ sum: 5 }`
@@ -472,6 +565,12 @@ The other runnable lessons are equally verifiable. See each lesson's README for 
 - **Observability** (`13-`) — every log line carries the same `request_id`
 - **File uploads** (`14-`) — both endpoints save 5 MB; only memory differs
 - **Idempotency** (`16-`) — same key twice, one charge
+- **WebSockets** (`17-`) — ticks arrive every second, typed message comes back
+- **Webhooks** (`18-`) — wrong signature returns 401
+- **Search** (`19-`) — hybrid finds documents each individual method misses
+- **Testing** (`21-`) — `pytest -v` shows `4 passed`
+
+Each lesson's README has the exact commands.
 
 ---
 
@@ -502,10 +601,11 @@ See **[`CONTRIBUTING.md`](CONTRIBUTING.md)** for the full recipe format. The sho
 
 **Good next lessons:**
 
-- WebSockets (the bidirectional counterpart to SSE)
-- Webhooks (inbound HTTP from third parties)
-- Search (full-text vs vector vs hybrid)
-- Deploy (Docker + one cloud, one provider)
+- WebSockets at scale (Redis pub/sub, sticky sessions)
+- Idempotency for webhooks (combining `16-` and `18-`)
+- Background job retry with exponential backoff
+- Observability with real metrics (Prometheus)
+- Deploy to a real provider (Fly.io, Railway, Cloud Run)
 
 **Bad candidates:** frontend topics, framework comparisons, anything that needs a Kubernetes cluster to demonstrate.
 
@@ -638,15 +738,47 @@ agentic-backend-cookbook/
 │       ├── README.md
 │       ├── requirements.txt
 │       └── main.py
-└── 16-idempotency/
+├── 16-idempotency/
+│   ├── README.md
+│   └── 01-fastapi-idempotency/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 17-websockets/
+│   ├── README.md
+│   └── 01-fastapi-websocket/
+│       ├── README.md
+│       ├── requirements.txt
+│       ├── main.py
+│       └── client.html
+├── 18-webhooks/
+│   ├── README.md
+│   └── 01-fastapi-webhook/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 19-search/
+│   ├── README.md
+│   └── 01-sqlite-hybrid-search/
+│       ├── README.md
+│       ├── requirements.txt
+│       └── main.py
+├── 20-deploy/
+│   ├── README.md
+│   └── 01-docker/
+│       ├── Dockerfile
+│       ├── docker-compose.yml
+│       └── .dockerignore
+└── 21-testing/
     ├── README.md
-    └── 01-fastapi-idempotency/
+    └── 01-pytest-example/
         ├── README.md
-        ├── requirements.txt
-        └── main.py
+        ├── conftest.py
+        ├── test_idempotency.py
+        └── requirements.txt
 ```
 
-**17 sections · ~85 tracked files · 10 verified runnable lessons**
+**22 sections · ~100 tracked files · 13 verified runnable lessons**
 
 ---
 
@@ -655,11 +787,13 @@ agentic-backend-cookbook/
 | Layer | Language / tool | Why |
 |---|---|---|
 | API and MCP lessons | **TypeScript / Node** | Types show the concept and are easy to skim |
-| RBAC, caching, rate limiting, streaming, observability, file uploads, transactions, idempotency | **Python / FastAPI** | Cleanest pattern for each |
+| RBAC, caching, rate limiting, streaming, observability, file uploads, transactions, idempotency, websockets, webhooks, search | **Python / FastAPI** | Cleanest pattern for each |
 | Background jobs | **Python (stdlib + SQLite)** | The loop is plain Python; no deps needed |
 | Agent harness | **Python (stdlib only)** | The loop is plain Python; no deps needed |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
 | Documentation lesson | **Markdown** | The contract is a document, not code |
+| Deploy | **Docker + Compose** | The universal deployment packaging |
+| Testing | **pytest** | The Python standard |
 | Reference docs | **Markdown + one FastAPI file** | Read-only comparison; one runnable Pydantic example |
 
 **These languages are examples, not requirements.** Each code lesson has an "In another language?" table showing Go, Rust, PHP, Ruby, Java, and C# equivalents.
@@ -673,7 +807,7 @@ agentic-backend-cookbook/
 | **Check Python** | `python -m py_compile` on every `.py` file, catching syntax errors |
 | **Check TypeScript** | `tsc --noEmit` on each lesson, catching type errors |
 
-These are **compile checks**, not behavioral tests. They catch rot as the repo is edited; they do not replace running the examples yourself. The database lessons are **not tested in CI** because that would need four live databases.
+These are **compile checks**, not behavioral tests. They catch rot as the repo is edited; they do not replace running the examples yourself. The database lessons are **not tested in CI** because that would need four live databases. The testing lesson (`21-testing/`) shows what a *behavioral* test looks like and could be wired into CI in a future PR.
 
 ---
 
