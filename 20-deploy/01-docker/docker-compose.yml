@@ -1,0 +1,79 @@
+# ─────────────────────────────────────────────────────────────
+# Local full-stack setup for the cookbook.
+#
+#   docker compose up          -> build and start everything
+#   docker compose up -d       -> background
+#   docker compose logs -f app -> follow the app's logs
+#   docker compose down        -> stop and remove containers
+#   docker compose down -v     -> also remove volumes (wipes DB)
+#
+# Three services:
+#   app      FastAPI (this lesson, or any lesson's main.py)
+#   db       Postgres 16 with pgvector (for 04-databases, 19-search)
+#   cache    Redis 7 (for 06-caching, 07-rate-limiting)
+#
+# The app connects to them via DATABASE_URL and REDIS_URL.
+# ─────────────────────────────────────────────────────────────
+
+services:
+  app:
+    build:
+      context: .                    # the lesson folder
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Connection strings for the services below. These are what
+      # the lessons' main.py files read if they support it — see
+      # 04-databases/02-postgres-crud and 06-caching/01-fastapi-cache.
+      DATABASE_URL: postgresql://cookbook:cookbook@db:5432/cookbook
+      REDIS_URL: redis://cache:6379/0
+      # Add lesson-specific secrets here. Never commit real values.
+      WEBHOOK_SECRET: dev-secret
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: cookbook
+      POSTGRES_PASSWORD: cookbook
+      POSTGRES_DB: cookbook
+    ports:
+      # Expose only to localhost, not the whole network.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cookbook -d cookbook"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  cache:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - cache_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db_data:
+  cache_data:
