@@ -50,31 +50,25 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8015
 ```
 
-**Step 2: The happy path (both endpoints)**
+**Step 2: Baseline**
 
 ```powershell
-# Reset balances and check
 curl.exe http://127.0.0.1:8015/balances
-
-# Transfer that succeeds (no ?fail=1)
-curl.exe "http://127.0.0.1:8015/transfer/broken?from_id=alice&to_id=bob&amount=30"
-curl.exe http://127.0.0.1:8015/balances
-# Alice: 70, Bob: 80
 ```
 
-Both endpoints succeed on the happy path. The difference only appears
-when something goes wrong.
+Expected:
+```json
+{"alice": 100, "bob": 50}
+```
 
 **Step 3: The bug — no transaction, forced failure**
 
 ```powershell
-curl.exe "http://127.0.0.1:8015/transfer/broken?from_id=alice&to_id=bob&amount=30&fail=1"
+curl.exe -X POST "http://127.0.0.1:8015/transfer/broken?from_id=alice&to_id=bob&amount=30&fail=1"
 ```
 
-Response: **500 Internal Server Error**
-```json
-{"detail":"simulated failure after debit (the bug)"}
-```
+Response: **500 Internal Server Error** (body is empty; the exception is
+logged to the server terminal).
 
 Now check the balances:
 
@@ -98,19 +92,21 @@ First, reset:
 ```powershell
 curl.exe -X POST http://127.0.0.1:8015/reset
 curl.exe http://127.0.0.1:8015/balances
-# Alice: 100, Bob: 50
+```
+
+Expected:
+```json
+{"alice": 100, "bob": 50}
 ```
 
 Now trigger the same failure, but on the transactional endpoint:
 
 ```powershell
-curl.exe "http://127.0.0.1:8015/transfer/safe?from_id=alice&to_id=bob&amount=30&fail=1"
+curl.exe -X POST "http://127.0.0.1:8015/transfer/safe?from_id=alice&to_id=bob&amount=30&fail=1"
 ```
 
-Response: **500 Internal Server Error** (the failure still happens)
-```json
-{"detail":"simulated failure after debit (safe endpoint - rolled back)"}
-```
+Response: **500 Internal Server Error** (the failure still happens; the
+body is empty).
 
 But now check the balances:
 
@@ -128,6 +124,11 @@ transaction was rolled back when the failure hit — the debit was undone.
 
 **That's the entire lesson.** Same failure, different outcome, because
 one endpoint wrapped the writes in a transaction and the other didn't.
+
+> Note: every transfer endpoint is `POST`. Calling it with `curl` without
+> `-X POST` gives `{"detail":"Method Not Allowed"}` — the endpoint exists,
+> but the verb is wrong. The `/balances` and `/reset` helpers follow the
+> same rule (`/reset` is `POST`, `/balances` is `GET`).
 
 ## Why the failure simulation matters
 
