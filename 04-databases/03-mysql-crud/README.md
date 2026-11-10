@@ -1,21 +1,3 @@
-✅ FILE 19 pushed: `95db3d1..43c94c5`, 67 insertions, 55 lines verified. **Postgres lesson complete.**
-
----
-
-## FILE 20 of 27
-
-**Path:**
-```
-D:\agentic-backend-cookbook\04-databases\03-mysql-crud\README.md
-```
-
-**Open it:**
-```powershell
-code D:\agentic-backend-cookbook\04-databases\03-mysql-crud\README.md
-```
-
-**Paste this:**
-```
 # MySQL CRUD
 
 Same CRUD as Postgres, different client and slightly different

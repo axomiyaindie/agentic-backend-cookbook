@@ -1,21 +1,3 @@
-✅ FILE 4 pushed: `0b7aa9d..78dbf3c`, 65 insertions, and the line count confirms **57 lines** — real content, not empty. That lesson is now complete and runnable.
-
----
-
-## FILE 5 of 27
-
-**Path:**
-```
-D:\agentic-backend-cookbook\01-api-design\02-crud-model\README.md
-```
-
-**Open it:**
-```powershell
-code D:\agentic-backend-cookbook\01-api-design\02-crud-model\README.md
-```
-
-**Paste this:**
-```
 # CRUD models
 
 ## What you'll learn

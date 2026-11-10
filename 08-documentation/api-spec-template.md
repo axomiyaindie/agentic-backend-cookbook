@@ -1,21 +1,3 @@
-✅ FILE 9 pushed: `251c1e5..126b3a4`, 89 insertions.
-
----
-
-## FILE 10 — `08-documentation/api-spec-template.md`
-
-**Path:**
-```
-D:\agentic-backend-cookbook\08-documentation\api-spec-template.md
-```
-
-**Open it:**
-```powershell
-code D:\agentic-backend-cookbook\08-documentation\api-spec-template.md
-```
-
-**Paste this:**
-```
 # API Spec — Template
 
 Copy this file for each endpoint you document. Fill in every section.

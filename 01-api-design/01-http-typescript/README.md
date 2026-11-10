@@ -1,21 +1,3 @@
-✅ FILE 2 pushed: `d657d20..bcb18fb`. Now the first language-footer README is live.
-
----
-
-## FILE 3 of 27
-
-**Path:**
-```
-D:\agentic-backend-cookbook\01-api-design\01-http-typescript\README.md
-```
-
-**Open it:**
-```powershell
-code D:\agentic-backend-cookbook\01-api-design\01-http-typescript\README.md
-```
-
-**Paste this:**
-```
 # HTTP + TypeScript types
 
 ## What you'll learn
@@ -51,4 +33,3 @@ typed language:
 
 The shape is always: define the fields once → derive the request type
 → derive the response type → let the compiler (or validator) check it.
-```

@@ -1,9 +1,9 @@
 # API styles
 
 Four ways to expose a backend: REST, GraphQL, gRPC, SOAP. Each exists
-because it solves a problem the others don't. Read this before
-`01-api-design/` — that section shows *how* a request looks; this file
-explains *why* you would pick one style over another.
+because it solves a problem the others don't. This file explains *what
+each style is* and *why you would pick one over another*. The runnable
+lessons in `01-api-design/` show how to implement the default (REST).
 
 ## The decision, in one table
 
@@ -20,23 +20,68 @@ That's the whole file in one table. The rest explains each row.
 
 ## 1. REST
 
-**What it is:** Resources are URLs. Operations are HTTP verbs
-(`GET`, `POST`, `PUT`, `PATCH`, `DELETE`). Responses are typically JSON.
-Status codes carry meaning (`200`, `201`, `404`, `403`, `429`).
+### What REST actually is
 
-**Strengths:** Universal. Every language, every tool, every proxy
-understands it. Cacheable via HTTP headers. Browser-friendly.
+REST stands for **Representational State Transfer**. It was defined by
+Roy Fielding in his 2000 PhD dissertation, as a set of architectural
+constraints for distributed systems. Most "REST APIs" implement only some
+of those constraints, so "REST" in practice means **"HTTP + JSON with a
+specific URL convention"**. That's what this file means by REST.
 
-**Trade-offs:** Over-fetching (the server decides what you get), under-fetching
-(you need multiple round-trips), versioning (the URL carries the API version),
-and no built-in streaming.
+Three ideas:
 
-**When to pick it:** Almost always for the first API. Public-facing,
-documented, cacheable. It's the default for a reason.
+**1. Everything is a resource.** A resource is any "thing" the client
+might want: a user, an order, a comment, a photo. Each resource has an
+identity — a URL. `GET /users/42` asks for the resource at `/users/42`,
+which is user 42. `POST /users` creates a new user in the `/users`
+collection. The URL names the thing; the verb names the action.
 
-**Usage:** 92% of organizations use REST APIs — highest of any style .
+**2. Operations are HTTP verbs.** The same URL does different things
+depending on the method:
 
-**A real request:**
+| Verb | What it does | Idempotent? | Example |
+|---|---|---|---|
+| `GET` | Read | Yes | `GET /users/42` → return user 42 |
+| `POST` | Create | **No** | `POST /users` → create a new user |
+| `PUT` | Replace | Yes | `PUT /users/42` → replace user 42 with the body |
+| `PATCH` | Update | Yes | `PATCH /users/42` → change only the fields in the body |
+| `DELETE` | Delete | Yes | `DELETE /users/42` → remove user 42 |
+
+"Idempotent" means: calling it twice has the same effect as calling it
+once. `PUT /users/42` twice leaves user 42 in the same state as
+`PUT /users/42` once. `POST /users` twice creates **two users** — that's
+why POST is not idempotent, and why retrying a POST is dangerous (see
+`16-idempotency/`).
+
+**3. Responses are self-describing.** Every response carries a **status
+code** that tells the client what happened, without the client needing to
+parse the body:
+
+| Code | Meaning | When |
+|---|---|---|
+| `200 OK` | Success | `GET`, `PATCH`, `PUT`, `DELETE` that returns a body |
+| `201 Created` | A new resource was created | `POST` |
+| `204 No Content` | Success, no body | `DELETE` |
+| `400 Bad Request` | The client's input is invalid | Malformed JSON, missing field |
+| `401 Unauthorized` | Not logged in | Missing or invalid token |
+| `403 Forbidden` | Logged in, but not allowed | Valid token, wrong role |
+| `404 Not Found` | The resource doesn't exist | `GET /users/9999` |
+| `409 Conflict` | The request conflicts with current state | Duplicate email, idempotency key in progress |
+| `422 Unprocessable Entity` | Valid JSON, but semantic errors | Field validation failed |
+| `429 Too Many Requests` | Rate limited | Over the limit (see `07-rate-limiting/`) |
+| `500 Internal Server Error` | The server has a bug | Unhandled exception |
+
+This is why REST is more than "HTTP with JSON". The status code *is* the
+contract. A client that sees `403` knows to show "you don't have
+permission." A client that sees `401` knows to log in. They are not the
+same thing, and the difference matters. The
+[`03-rbac-admin/`](../03-rbac-admin/) and
+[`08-documentation/example-spec.md`](../08-documentation/example-spec.md)
+lessons demonstrate this.
+
+### What a REST request actually looks like
+
+Fetch user 42:
 
 ```http
 GET /users/42 HTTP/1.1
@@ -55,8 +100,105 @@ Content-Type: application/json
 }
 ```
 
-This is exactly what the RBAC lesson (`03-rbac-admin/`) implements. If you
-can read that lesson, you can read any REST API.
+Create a user:
+
+```http
+POST /users HTTP/1.1
+Host: api.example.com
+Authorization: Bearer token-admin
+Content-Type: application/json
+
+{
+  "name": "New User",
+  "email": "new@example.com"
+}
+```
+
+```http
+HTTP/1.1 201 Created
+Location: /users/43
+Content-Type: application/json
+
+{
+  "id": 43,
+  "name": "New User",
+  "email": "new@example.com"
+}
+```
+
+The `Location` header in the 201 response is part of the REST
+convention — it tells the client where to find the new resource.
+
+### The constraints that make it REST
+
+Fielding defined six constraints. Most modern "REST APIs" implement the
+first two and skip the rest. That's fine — nobody is grading you — but
+it's worth knowing what "REST" actually means:
+
+| Constraint | What it means | Do modern REST APIs follow it? |
+|---|---|---|
+| **Client-server** | Separate the UI from the data storage | Yes |
+| **Stateless** | Every request carries everything the server needs (auth token, not a session) | Yes |
+| **Cacheable** | Responses declare whether they can be cached | Sometimes |
+| **Uniform interface** | Resources, verbs, self-descriptive messages | Yes |
+| **Layered system** | The client doesn't know if it's talking to the origin server or a proxy | Yes |
+| **Code on demand** (optional) | The server can send executable code (JavaScript) to the client | Rarely |
+
+"Stateless" is the one that matters most in practice: **every request
+must include the auth token**. There is no server-side session. This is
+why REST scales — any server can handle any request.
+
+### Strengths
+
+- **Universal.** Every language, every tool, every proxy, every browser
+  understands HTTP. There is no "REST client" to install.
+- **Cacheable** via standard HTTP headers (`Cache-Control`, `ETag`).
+  The browser can cache a `GET` response; nothing else needs to know.
+- **Human-readable.** You can `curl` a REST endpoint and read the
+  response. You can't do that with gRPC.
+- **Stateless.** Any server can handle any request. Scale by adding
+  servers, not by adding sessions.
+- **Status codes mean something.** 200 / 401 / 403 / 404 / 429 are the
+  contract between client and server.
+
+### Trade-offs
+
+- **Over-fetching.** The server decides what fields to return.
+  `GET /users/42` might return 20 fields when the client needed 2.
+- **Under-fetching.** To get user 42 and their 3 latest posts, you might
+  need two requests (`GET /users/42`, then `GET /users/42/posts?limit=3`).
+  GraphQL exists partly to fix this.
+- **No built-in streaming.** REST returns the whole response. Streaming
+  needs SSE (see `12-streaming/`) or WebSockets (`17-websockets/`).
+- **Versioning is manual.** `/v1/users` vs `/v2/users` — the URL carries
+  the version. Some teams prefer headers; both work.
+
+### When to pick REST
+
+**Almost always for the first API.** Public-facing, documented, cacheable,
+universally understood. The default for a reason.
+
+REST is wrong when:
+
+- **Clients have very different field needs** → GraphQL
+- **You're calling a service from another service** → gRPC
+- **The other party requires SOAP** → SOAP
+
+If none of those is true, REST is the answer.
+
+### Usage
+
+92% of organizations use REST APIs — highest of any style.
+
+### Where this cookbook implements it
+
+- [`01-api-design/`](../01-api-design/) — typed requests, CRUD verbs
+- [`03-rbac-admin/`](../03-rbac-admin/) — REST with auth, 200/403/401
+- [`15-transactions/`](../15-transactions/) — REST writes with transactions
+- [`16-idempotency/`](../16-idempotency/) — REST retries, safe
+- [`18-webhooks/`](../18-webhooks/) — REST receiving inbound POSTs
+
+If you can read any of those, you can read any REST API.
 
 ---
 
@@ -78,7 +220,7 @@ not per-endpoint. Not human-readable over `curl` without a client.
 fields, web wants more), or when you'd otherwise build 5 REST endpoints
 that all call the same database.
 
-**Usage:** ~70% of developers report using GraphQL, up from ~61% in 2024 .
+**Usage:** ~70% of developers report using GraphQL, up from ~61% in 2024.
 
 **A real request:**
 
@@ -134,7 +276,7 @@ commitment. Not human-friendly for debugging.
 **When to pick it:** Internal service-to-service communication,
 microservices, high-throughput low-latency, streaming data.
 
-**Usage:** ~44% of developers use gRPC, up from ~35% in 2024 . It's
+**Usage:** ~44% of developers use gRPC, up from ~35% in 2024. It's
 growing fastest in service-to-service and AI workloads, where binary
 efficiency matters.
 
@@ -183,7 +325,7 @@ legacy enterprise service that requires it.
 
 **Usage:** ~38% of developers still use SOAP, almost entirely because of
 legacy or industry requirements — healthcare (HL7), finance (SWIFT,
-FIX), telecom (TM Forum), government procurement .
+FIX), telecom (TM Forum), government procurement.
 
 **A real request:**
 
