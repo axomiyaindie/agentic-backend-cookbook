@@ -41,13 +41,15 @@ jobs:
         working-directory: ${{ matrix.lesson }}
         run: |
           set -e
-          # Use the pinned TypeScript from package.json if present,
-          # otherwise fall back to a specific version via npx.
           if [ -f node_modules/.bin/tsc ]; then
+            # The lesson has its own TypeScript (from package.json).
             ./node_modules/.bin/tsc --noEmit --strict \
               --target ES2022 --module ESNext --moduleResolution bundler *.ts
           else
-            npx --yes typescript@5.6.3 tsc --noEmit --strict \
+            # No package.json. Use a pinned TypeScript via npx.
+            # `-p typescript@5.6.3` tells npx which package to install;
+            # `tsc` after it is the executable to run from that package.
+            npx --yes -p typescript@5.6.3 tsc --noEmit --strict \
               --target ES2022 --module ESNext --moduleResolution bundler *.ts
           fi
           echo "Type-check passed for ${{ matrix.lesson }}"
