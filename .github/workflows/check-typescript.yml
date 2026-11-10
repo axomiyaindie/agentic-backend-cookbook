@@ -47,7 +47,7 @@ jobs:
             ./node_modules/.bin/tsc --noEmit --strict \
               --target ES2022 --module ESNext --moduleResolution bundler *.ts
           else
-            npx --yes typescript@5.6.0 tsc --noEmit --strict \
+            npx --yes typescript@5.6.3 tsc --noEmit --strict \
               --target ES2022 --module ESNext --moduleResolution bundler *.ts
           fi
           echo "Type-check passed for ${{ matrix.lesson }}"
