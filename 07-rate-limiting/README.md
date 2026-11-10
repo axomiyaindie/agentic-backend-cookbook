@@ -1,23 +1,3 @@
-✅ FILE 4 pushed: `8d6c9b9..1ab5ac0`, 99 insertions, 79 lines verified. **Caching lesson complete.**
-
----
-
-## FILE 5 — `07-rate-limiting/README.md`
-
-**Path:**
-```
-D:\agentic-backend-cookbook\07-rate-limiting\README.md
-```
-
-**Create folder and file:**
-```powershell
-cd D:\agentic-backend-cookbook
-New-Item -ItemType Directory -Force -Path 07-rate-limiting | Out-Null
-code 07-rate-limiting\README.md
-```
-
-**Paste this:**
-```
 # Rate limiting
 
 **Rate limiting** = controlling how many requests a client can make in a

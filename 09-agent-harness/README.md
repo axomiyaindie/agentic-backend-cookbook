@@ -1,4 +1,3 @@
-```
 # Agent harness
 
 **Agent harness** = the runtime loop that decides when the model wants a
@@ -111,4 +110,3 @@ and a dictionary of functions:
 
 If you understand the loop, you can read a harness in any language in
 under five minutes.
-```

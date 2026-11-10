@@ -1,23 +1,3 @@
-Let's add all three sections to the cookbook. Same pattern: folders, files, one at a time, commit and push each.
-
----
-
-## FILE 1 — `06-caching/README.md`
-
-**Path:**
-```
-D:\agentic-backend-cookbook\06-caching\README.md
-```
-
-**Create folder and file:**
-```powershell
-cd D:\agentic-backend-cookbook
-New-Item -ItemType Directory -Force -Path 06-caching | Out-Null
-code 06-caching\README.md
-```
-
-**Paste this:**
-```
 # Caching
 
 **Caching** = storing the result of an expensive operation so the next
