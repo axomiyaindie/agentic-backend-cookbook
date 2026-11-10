@@ -1,3 +1,4 @@
+```
 <div align="center">
 
 <img src="assets/logo.svg" alt="Agentic Backend Cookbook" width="100%" />
@@ -42,6 +43,9 @@ read the README  ->  run the example  ->  break it on purpose  ->  understand wh
 | How does a server decide who is allowed to do what? | [`03-rbac-admin`](03-rbac-admin/) |
 | Which database should I pick, and why? | [`04-databases`](04-databases/) |
 | What does that word actually mean? | [`05-glossary`](05-glossary/) |
+| How do I make an expensive endpoint fast? | [`06-caching`](06-caching/) |
+| How do I stop one client from using up all my capacity? | [`07-rate-limiting`](07-rate-limiting/) |
+| How do I write the API doc the frontend (or AI) will actually use? | [`08-documentation`](08-documentation/) |
 
 By the end you will be able to read AI-generated backend code and tell, with confidence, whether it is sound or quietly broken.
 
@@ -106,8 +110,11 @@ flowchart LR
     B --> C[02 MCP connectors]
     C --> D[03 RBAC admin]
     D --> E[04 Databases]
-    E --> F[05 Glossary]
-    F -. look up any term .-> B
+    E --> F[06 Caching]
+    F --> G[07 Rate limiting]
+    G --> H[08 Documentation]
+    E --> I[05 Glossary]
+    I -. look up any term .-> B
 ```
 
 Start at **[`00-roadmap/README.md`](00-roadmap/README.md)**. It tells you which lesson to read first and why, and doubles as a safety net: if an AI generates backend code you do not understand, the roadmap points you to the lesson that explains it.
@@ -203,6 +210,38 @@ Plain-English definitions of every term used in this repo: API, CRUD, RBAC, JWT,
 |---|---|
 | [`05-glossary/README.md`](05-glossary/README.md) | A to Z of terms in the cookbook |
 
+### [`06-caching/`](06-caching/) - Make expensive endpoints fast
+
+The cache-aside pattern with TTL, demonstrated with a 2-second fake "expensive operation" that becomes instant on the second call. Walk through cache miss, cache hit, TTL expiry, and manual invalidation side by side.
+
+| File | What it is |
+|---|---|
+| [`06-caching/README.md`](06-caching/README.md) | What caching is, the cache-aside flow, and the three hard problems |
+| [`06-caching/01-fastapi-cache/README.md`](06-caching/01-fastapi-cache/README.md) | Step-by-step walkthrough with expected elapsed times |
+| [`06-caching/01-fastapi-cache/main.py`](06-caching/01-fastapi-cache/main.py) | Hand-written cache with TTL: see the mechanism, not a decorator |
+| [`06-caching/01-fastapi-cache/requirements.txt`](06-caching/01-fastapi-cache/requirements.txt) | `fastapi` and `uvicorn` |
+
+### [`07-rate-limiting/`](07-rate-limiting/) - Survive traffic spikes
+
+The fixed-window algorithm, hand-written so you can see the counter increment. Demonstrates HTTP 429, `Retry-After`, and the `X-RateLimit-*` headers that tell a client when to back off.
+
+| File | What it is |
+|---|---|
+| [`07-rate-limiting/README.md`](07-rate-limiting/README.md) | Why rate limit, the three algorithms, and why 401 vs 403 matters |
+| [`07-rate-limiting/01-fastapi-rate-limit/README.md`](07-rate-limiting/01-fastapi-rate-limit/README.md) | Walkthrough: 5 requests pass, the 6th returns 429 |
+| [`07-rate-limiting/01-fastapi-rate-limit/main.py`](07-rate-limiting/01-fastapi-rate-limit/main.py) | Hand-written limiter with `X-RateLimit-*` headers |
+| [`07-rate-limiting/01-fastapi-rate-limit/requirements.txt`](07-rate-limiting/01-fastapi-rate-limit/requirements.txt) | `fastapi` and `uvicorn` |
+
+### [`08-documentation/`](08-documentation/) - The contract
+
+A fill-in-the-blanks API spec template, plus a fully worked example that documents the RBAC lesson from `03-rbac-admin/`. Shows 401 vs 403, error shapes, and the one-paragraph summary table readers actually use.
+
+| File | What it is |
+|---|---|
+| [`08-documentation/README.md`](08-documentation/README.md) | Why API docs matter (for humans and AI) |
+| [`08-documentation/api-spec-template.md`](08-documentation/api-spec-template.md) | Copy-paste template for documenting one endpoint |
+| [`08-documentation/example-spec.md`](08-documentation/example-spec.md) | The RBAC lesson, fully documented |
+
 ---
 
 ## Verify it yourself
@@ -246,6 +285,8 @@ npx tsx server.ts
 # prints the tools/list schema and { sum: 5 }
 ```
 
+The caching lesson (second call is instant) and the rate limiting lesson (the 6th request returns 429) follow the same pattern — see their READMEs for exact commands.
+
 ---
 
 ## What you can do with this repo
@@ -275,7 +316,6 @@ See **[`CONTRIBUTING.md`](CONTRIBUTING.md)** for the full recipe format. The sho
 
 **Good next lessons:**
 
-- Rate limiting and backpressure
 - Background jobs and queues
 - File uploads and storage
 - WebSockets and streaming
@@ -306,7 +346,7 @@ PRs welcome. Small PRs preferred. One commit per file or per lesson, no "fix typ
 | Layer | Language / tool | Why |
 |---|---|---|
 | API and MCP lessons | **TypeScript / Node** | Types show the concept and are easy to skim |
-| RBAC lesson | **Python / FastAPI** | Cleanest role-check pattern |
+| RBAC, caching, rate limiting lessons | **Python / FastAPI** | Cleanest pattern for each |
 | Databases | **Postgres, MySQL, MongoDB, DynamoDB** | Same CRUD, four engines |
 
 **These languages are examples, not requirements.** Each lesson has an "In another language?" table showing Go, Rust, PHP, Ruby, Java, and C# equivalents.
@@ -332,3 +372,4 @@ It is the only signal that tells other learners the examples are worth their tim
 MIT License. See [`LICENSE`](LICENSE). Use it, fork it, teach with it.
 
 </div>
+```
