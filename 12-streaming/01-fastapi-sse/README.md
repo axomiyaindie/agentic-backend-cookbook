@@ -56,13 +56,13 @@ Expected output:
 ```
 data: Hello
 
-data: Hello from
+data: from
 
-data: Hello from a
+data: a
 
-data: Hello from a streaming
+data: streaming
 
-data: Hello from a streaming server!
+data: server!
 
 ```
 
