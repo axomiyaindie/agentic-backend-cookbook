@@ -13,6 +13,7 @@ on:
 
 jobs:
   typecheck:
+    name: Type-check ${{ matrix.lesson }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -29,11 +30,24 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Type-check ${{ matrix.lesson }}
+      - name: Install dependencies (if package.json exists)
+        working-directory: ${{ matrix.lesson }}
+        run: |
+          if [ -f package.json ]; then
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Type-check
         working-directory: ${{ matrix.lesson }}
         run: |
           set -e
-          npx --yes tsc --noEmit --strict --target ES2022 --module ESNext \
-            --moduleResolution bundler \
-            *.ts
+          # Use the pinned TypeScript from package.json if present,
+          # otherwise fall back to a specific version via npx.
+          if [ -f node_modules/.bin/tsc ]; then
+            ./node_modules/.bin/tsc --noEmit --strict \
+              --target ES2022 --module ESNext --moduleResolution bundler *.ts
+          else
+            npx --yes typescript@5.6.0 tsc --noEmit --strict \
+              --target ES2022 --module ESNext --moduleResolution bundler *.ts
+          fi
           echo "Type-check passed for ${{ matrix.lesson }}"
