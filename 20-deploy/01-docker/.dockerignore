@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────
+# What NOT to send to the Docker build context.
+#
+# The build context is everything Docker sends to the daemon
+# before the build starts. Without this file, that includes
+# node_modules, .venv, .git, and every database file — often
+# hundreds of MB that never get used.
+#
+# Keeping this file small and correct makes builds faster and
+# prevents secrets from leaking into an image layer.
+# ─────────────────────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Runtime data — never bake databases into an image
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+uploads/
+
+# Secrets — never send .env to the build daemon
+.env
+.env.*
+!.env.example
+
+# Git and CI
+.git/
+.gitignore
+.github/
+
+# Docker itself — avoid recursive context
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs and local artifacts
+*.log
+dist/
+build/

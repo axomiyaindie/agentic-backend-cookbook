@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SSE streaming demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      color: #1f2937;
+    }
+    h1 { font-size: 1.5rem; }
+    #output {
+      min-height: 4rem;
+      padding: 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f9fafb;
+      font-family: ui-monospace, monospace;
+      white-space: pre-wrap;
+    }
+    #status { color: #6b7280; font-size: 0.9rem; margin-top: 1rem; }
+    .chunk {
+      display: inline;
+      animation: fade 0.3s ease-in;
+    }
+    @keyframes fade {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+    }
+    button:hover { background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <h1>SSE streaming demo</h1>
+  <p>
+    Click <strong>Start stream</strong>. Words will appear one per second.
+    That is Server-Sent Events: the server pushes each chunk as it is
+    produced, and <code>EventSource</code> fires <code>onmessage</code>
+    for each one.
+  </p>
+
+  <div id="output"></div>
+  <div id="status">Not connected.</div>
+  <button id="start">Start stream</button>
+
+  <script>
+    // ────────────────────────────────────────────────────────
+    // The whole client is 15 lines. `new EventSource(url)`
+    // connects to an SSE endpoint. The browser handles the
+    // connection, the protocol, and automatic reconnect.
+    //
+    // Each `data:` line the server sends arrives here as one
+    // `onmessage` event.
+    // ────────────────────────────────────────────────────────
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+    const start = document.getElementById('start');
+
+    let source = null;
+
+    start.addEventListener('click', () => {
+      // Clean up any previous connection.
+      if (source) source.close();
+      output.textContent = '';
+      status.textContent = 'Connecting...';
+
+      source = new EventSource('/stream');
+
+      source.onopen = () => {
+        status.textContent = 'Connected. Waiting for events...';
+      };
+
+      source.onmessage = (event) => {
+        // Append each chunk as its own span, so the fade-in
+        // animation plays per word.
+        const span = document.createElement('span');
+        span.className = 'chunk';
+        span.textContent = event.data + ' ';
+        output.appendChild(span);
+        status.textContent = `Received: ${event.data}`;
+      };
+
+      source.onerror = () => {
+        // EventSource reconnects automatically. When it does,
+        // onopen fires again. Here we just show the error.
+        status.textContent = 'Stream ended or connection lost.';
+        source.close();
+        source = null;
+      };
+    });
+  </script>
+</body>
+</html>
